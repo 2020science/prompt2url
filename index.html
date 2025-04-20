@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- =============================================
+       Basic page metadata
+       ============================================= -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prompt‑to‑URL Generator — ChatGPT & Perplexity</title>
+  <meta name="description" content="Paste a prompt (optionally containing a [URL] placeholder) and instantly get shareable ChatGPT or Perplexity links." />
+
+  <!-- =============================================
+       Fonts & colour palette
+       ============================================= -->
+  <style>
+    /* Google Font */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    /* Design tokens */
+    :root {
+      --accent: #4b6aff;  /* focus ring */
+      --dark:   #0b0b0b;
+      --light:  #ffffff;
+      --warn:   #c52929;  /* long‑URL warning */
+      --border-radius: 8px;
+      --icon: #666666;
+    }
+
+    /* Layout reset  */
+    * { box-sizing: border-box; }
+
+    /* ---------------------------------------------
+       Layout & typography
+       --------------------------------------------- */
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: linear-gradient(145deg, #fafafa 0%, #f1f1f5 100%);
+      color: var(--dark);
+      margin: 0;
+      padding: 2rem 1rem 4rem;
+      display: flex;
+      justify-content: center;
+    }
+
+    main { width: 100%; max-width: 750px; }
+
+    h1 {
+      font-size: 1.75rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      font-weight: 700;
+    }
+
+    p.lead {
+      text-align: center;
+      margin-top: -1rem;
+      margin-bottom: 2.25rem;
+      font-size: 1rem;
+      color: #333;
+    }
+
+    /* ---------------------------------------------
+       Form controls
+       --------------------------------------------- */
+    label {
+      font-weight: 600;
+      margin-bottom: .35rem;
+      display: block;
+    }
+
+    textarea,
+    input[type="text"] {
+      width: 100%;
+      padding: .9rem 1rem;
+      border: 1px solid var(--dark);
+      border-radius: var(--border-radius);
+      font: inherit;
+      font-size: .96rem;
+      background: var(--light);
+      resize: vertical;
+      transition: border-color .15s ease;
+    }
+
+    textarea:focus,
+    input[type="text"]:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    textarea { min-height: 6.5rem; }
+
+    /* Action buttons */
+    .btn {
+      display: inline-block;
+      border: 1px solid var(--dark);
+      background: var(--light);
+      padding: .55rem 1.6rem;
+      font-weight: 600;
+      font-size: 1rem;
+      border-radius: 15px;
+      cursor: pointer;
+      margin: 1.5rem 0;
+      transition: background .15s ease;
+    }
+
+    .btn:hover { background: #ececf5; }
+
+    /* ---------------------------------------------
+       Output containers
+       --------------------------------------------- */
+    .output-box { margin-bottom: 2rem; }
+    .textarea-wrapper { position: relative; }
+
+    /* Icon buttons (copy / open) */
+    .actions {
+      position: absolute;
+      top: .5rem;
+      right: .5rem;
+      display: flex;
+      gap: .75rem;
+      pointer-events: none;  /* click only on anchors inside */
+    }
+
+    .actions a {
+      pointer-events: all;
+      width: 1.25rem;
+      height: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--icon);
+      text-decoration: none;
+      border-radius: 3px;
+      transition: background .15s ease, color .15s ease;
+      position: relative;   /* anchor for tooltip */
+    }
+
+    .actions a:hover { background: rgba(0,0,0,.06); color: var(--dark); }
+    .actions svg  { width: 100%; height: 100%; fill: currentColor; }
+
+    /* ---------------------------------------------
+       Tooltips for icon buttons (pure CSS)
+       --------------------------------------------- */
+    .actions a::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + .3rem);
+      right: 50%;
+      transform: translateX(50%);
+      background: var(--dark);
+      color: var(--light);
+      font-size: .72rem;
+      padding: .2rem .45rem;
+      border-radius: 4px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s ease;
+    }
+
+    .actions a:hover::after { opacity: .92; }
+
+    /* ---------------------------------------------
+       Warning banner (long URLs)
+       --------------------------------------------- */
+    #warnLen {
+      display: none;
+      margin: 0 0 1rem;
+      padding: .6rem 1rem;
+      border: 2px solid var(--warn);
+      background: #ffecec;
+      color: var(--warn);
+      border-radius: var(--border-radius);
+      font-size: .9rem;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      font-size: .85rem;
+      color: #666;
+      position: fixed;
+      bottom: 1rem;
+      left: 0;
+      right: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Prompt‑to‑URL Generator</h1>
+    <p class="lead">Turn any prompt (with an optional link) into clickable ChatGPT / Perplexity URLs in one step.</p>
+
+    <!-- User prompt -->
+    <label for="prompt">Prompt <small>(Use <code>[URL]</code> as placeholder, ≤ 1000 chars)</small></label>
+    <textarea id="prompt" maxlength="1000" placeholder="e.g. Summarise this page and suggest three follow‑up questions: [URL]"></textarea>
+
+    <!-- Optional article URL to replace [URL] tokens -->
+    <label for="articleUrl">URL <small>(optional — replaces <code>[URL]</code>)</small></label>
+    <input type="text" id="articleUrl" placeholder="https://example.com/post" />
+
+    <!-- Primary action buttons -->
+    <button class="btn" id="generateBtn">Generate URL</button>
+
+    <!-- Length warning -->
+    <div id="warnLen">Heads‑up: this URL is longer than 2 000 characters and may not open correctly in all browsers.</div>
+
+    <!-- ChatGPT output -->
+    <div class="output-box">
+      <label for="chatgptOut">ChatGPT</label>
+      <div class="textarea-wrapper">
+        <textarea id="chatgptOut" readonly></textarea>
+        <div class="actions">
+          <!-- Copy to clipboard -->
+          <a href="#" class="copy" data-target="chatgptOut" data-tip="Copy URL" aria-label="Copy URL">
+            <!-- overlapping rectangles icon -->
+            <svg viewBox="0 0 24 24"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm4 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h12v14z"/></svg>
+          </a>
+          <!-- Open in new tab -->
+          <a href="#" class="open" data-target="chatgptOut" data-tip="Open in new tab" aria-label="Open URL" target="_blank">
+            <svg viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.41l-9.293 9.293l-1.414-1.414L17.586 5H14V3ZM5 5h6v2H6.998v10.002H17V13h2v6H5V5Z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Perplexity output -->
+    <div class="output-box">
+      <label for="perplexityOut">Perplexity</label>
+      <div class="textarea-wrapper">
+        <textarea id="perplexityOut" readonly></textarea>
+        <div class="actions">
+          <a href="#" class="copy" data-target="perplexityOut" data-tip="Copy URL" aria-label="Copy URL">
+            <svg viewBox="0 0 24 24"><path d="M16 1H6a2 2 0 0 0-2 2v12h2V3h10V1zm4 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm0 16H8V7h12v14z"/></svg>
+          </a>
+          <a href="#" class="open" data-target="perplexityOut" data-tip="Open in new tab" aria-label="Open URL" target="_blank">
+            <svg viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.41l-9.293 9.293l-1.414-1.414L17.586 5H14V3ZM5 5h6v2H6.998v10.002H17V13h2v6H5V5Z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn" id="resetBtn">Reset</button>
+  </main>
+
+  <footer>© Andrew Maynard — CC BY‑NC‑SA</footer>
+
+  <!-- JavaScript disabled fallback -->
+  <noscript>
+    <style>noscript{display:block;text-align:center;margin-top:2rem;color:var(--warn);font-weight:600}</style>
+    ⚠️ This tool needs JavaScript to build your URLs.
+  </noscript>
+
+  <!-- =============================================
+       Behaviour — vanilla JS, no dependencies
+       ============================================= -->
+  <script>
+    /* Config ---------------------------------------------------------- */
+    const TEMPLATE_PROMPT = "";          // Reserved: extra text to append
+    const WARN_THRESHOLD = 2000;          // characters | browsers vary 2–8 k
+
+    /* DOM shortcuts --------------------------------------------------- */
+    const promptEl      = document.getElementById('prompt');
+    const urlEl         = document.getElementById('articleUrl');
+    const chatgptOutEl  = document.getElementById('chatgptOut');
+    const perplexOutEl  = document.getElementById('perplexityOut');
+    const warnLenEl     = document.getElementById('warnLen');
+
+    const generateBtn   = document.getElementById('generateBtn');
+    const resetBtn      = document.getElementById('resetBtn');
+
+    /* Utilities ------------------------------------------------------- */
+    /**
+     * Build an encoded prompt suitable for query strings.
+     * - Trims whitespace
+     * - Replaces every (case‑insensitive) [URL] token
+     * - Optionally appends TEMPLATE_PROMPT
+     */
+    function buildEncodedPrompt(rawPrompt, articleUrl) {
+      let finalPrompt = rawPrompt.trim();
+
+      if (articleUrl) {
+        // global & case‑insensitive replacement
+        finalPrompt = finalPrompt.replace(/\[URL\]/gi, articleUrl.trim());
+      }
+
+      if (TEMPLATE_PROMPT) {
+        finalPrompt += TEMPLATE_PROMPT;
+      }
+
+      return encodeURIComponent(finalPrompt);
+    }
+
+    /** Copy handler for both outputs */
+    function copyHandler(evt) {
+      evt.preventDefault();
+      const id = evt.currentTarget.dataset.target;
+      const text = document.getElementById(id).value;
+      if (!text) return;
+
+      navigator.clipboard.writeText(text).then(() => {
+        evt.currentTarget.classList.add('copied');
+        setTimeout(() => evt.currentTarget.classList.remove('copied'), 1200);
+      });
+    }
+
+    /** Anchor click: allow default navigation only if url exists */
+    function openHandler(evt) {
+      const id = evt.currentTarget.dataset.target;
+      const url = document.getElementById(id).value;
+      if (!url) {
+        evt.preventDefault();
+        return;
+      }
+      evt.currentTarget.href = url; // keep default behaviour
+    }
+
+    /** Attach copy/open listeners to all action icons */
+    function wireActions() {
+      document.querySelectorAll('.copy').forEach(a => a.addEventListener('click', copyHandler));
+      document.querySelectorAll('.open').forEach(a => a.addEventListener('click', openHandler));
+    }
+
+    /* Main: generate URLs ------------------------------------------- */
+    generateBtn.addEventListener('click', () => {
+      const userPrompt = promptEl.value.trim();
+      if (!userPrompt) {
+        alert('Please enter a prompt.');
+        return;
+      }
+
+      const articleUrl = urlEl.value.trim();
+      const encoded = buildEncodedPrompt(userPrompt, articleUrl);
+
+      // Show/hide long‑URL warning
+      warnLenEl.style.display = encoded.length > WARN_THRESHOLD ? 'block' : 'none';
+
+      // Destination links
+      chatgptOutEl.value  = `https://chatgpt.com/?q=${encoded}`;
+      perplexOutEl.value  = `https://www.perplexity.ai/search?q=${encoded}`;
+    });
+
+    /* Reset form & outputs ------------------------------------------- */
+    resetBtn.addEventListener('click', () => {
+      promptEl.value = '';
+      urlEl.value = '';
+      chatgptOutEl.value = '';
+      perplexOutEl.value = '';
+      warnLenEl.style.display = 'none';
+    });
+
+    /* Initial setup */
+    wireActions();
+  </script>
+</body>
+</html>
