@@ -296,6 +296,9 @@
       if (TEMPLATE_PROMPT) {
         finalPrompt += TEMPLATE_PROMPT;
       }
+      
+      // Strip trailing punctuation like periods, exclamations, etc.
+  	  finalPrompt = finalPrompt.replace(/[.!?…]+$/, '');
 
       return encodeURIComponent(finalPrompt);
     }
